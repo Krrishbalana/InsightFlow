@@ -1,11 +1,17 @@
-const express = require("express");
+import dotenv from "dotenv";
+dotenv.config();
+
+import express from "express";
+import cookieParser from "cookie-parser";
+import authRoutes from "./routes/authRoutes.js";
+import connectDB from "./config/db.js";
+
 const app = express();
-const PORT = 3000;
+app.use(express.json());
+app.use(cookieParser()); // ✅ enables reading & sending cookies
 
-app.get("/", (req, res) => {
-  res.send("Hello, World!");
-});
+await connectDB(); // make sure MongoDB is connected
 
-app.listen(PORT, () => {
-  console.log(`Server is running at http://localhost:${PORT}`);
-});
+app.use("/api/auth", authRoutes);
+
+app.listen(3000, () => console.log("✅ Server running on port 3000"));
