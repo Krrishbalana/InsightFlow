@@ -50,5 +50,5 @@ Originally, the backend processed entire files in memory, which caused lags and 
 ---
 
 **Author:** [Krish Balana](https://www.linkedin.com/in/krrish-balana/)  
-📧 *krishbalana@gmail.com*  
+📧 *krrishbalana@gmail.com*  
 💻 [GitHub](https://github.com/krrishbalana)
