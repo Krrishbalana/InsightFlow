@@ -15,8 +15,8 @@ function App() {
 
   useEffect(() => {
     // Start fade-out after 2.5s and hide intro at 3s
-    const fadeTimer = setTimeout(() => setFadeOut(true), 2500);
-    const hideTimer = setTimeout(() => setShowIntro(false), 3000);
+    const fadeTimer = setTimeout(() => setFadeOut(true), 3100);
+    const hideTimer = setTimeout(() => setShowIntro(false), 3400);
 
     return () => {
       clearTimeout(fadeTimer);
@@ -35,7 +35,7 @@ function App() {
           text="Welcome to Your Personal Data Analyst !"
           className="text-9xl font-light tracking-tighter text-zinc-200"
           delay={80}
-          duration={0.7}
+          duration={0.8}
           ease="power3.out"
           splitType="chars"
           from={{ opacity: 0, y: 40 }}

@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./GooeyNav.css";
 
 const GooeyNav = ({
@@ -10,12 +11,14 @@ const GooeyNav = ({
   timeVariance = 300,
   colors = [1, 2, 3, 1, 2, 3, 1, 4],
   initialActiveIndex = 0,
+  onItemClick, // Accept onItemClick prop from parent
 }) => {
   const containerRef = useRef(null);
   const navRef = useRef(null);
   const filterRef = useRef(null);
   const textRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(initialActiveIndex);
+  const navigate = useNavigate();
 
   const noise = (n = 1) => n / 2 - Math.random() * n;
 
@@ -95,6 +98,7 @@ const GooeyNav = ({
   };
 
   const handleClick = (e, index) => {
+    e.preventDefault();
     const liEl = e.currentTarget;
     if (activeIndex === index) return;
 
@@ -108,13 +112,24 @@ const GooeyNav = ({
 
     if (textRef.current) {
       textRef.current.classList.remove("active");
-
       void textRef.current.offsetWidth;
       textRef.current.classList.add("active");
     }
 
     if (filterRef.current) {
       makeParticles(filterRef.current);
+    }
+
+    // Use onItemClick callback if provided
+    if (typeof items[index].onClick === "function") {
+      items[index].onClick(e, items[index]);
+    } else if (typeof onItemClick === "function") {
+      onItemClick(items[index]);
+    } else {
+      const href = items[index].href;
+      if (href) {
+        navigate(href);
+      }
     }
   };
 
@@ -158,6 +173,7 @@ const GooeyNav = ({
                 href={item.href}
                 onClick={(e) => handleClick(e, index)}
                 onKeyDown={(e) => handleKeyDown(e, index)}
+                tabIndex={0}
               >
                 {item.label}
               </a>

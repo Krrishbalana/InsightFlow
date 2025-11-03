@@ -1,9 +1,41 @@
 // src/pages/Login.jsx
-import React from "react";
+import React, { useState } from "react";
 import Navbar from "../components/Navbar";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const Register = () => {
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await axios.post(
+        "http://localhost:3000/api/auth/register",
+        form
+      );
+      // Registration successful? Redirect or show message.
+      navigate("/");
+    } catch (err) {
+      if (err.response && err.response.data && err.response.data.message) {
+        setError(err.response.data.message);
+      } else {
+        setError("Registration failed. Try again.");
+      }
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-screen w-full flex ">
       {/* Left background panel with logo, nav, welcome */}
@@ -20,8 +52,8 @@ const Register = () => {
           {/* Logo + Navbar links (horizontal row, spaced apart) */}
           <Navbar />
         </div>
-        <h1 className="text-white absolute top-1/2 left-2/3 transform -translate-x-1/2 -translate-y-1/2 text-9xl font-black mb-6 z-10">
-          Welcome To AI World!
+        <h1 className="text-white font-light text-center absolute top-1/2 left-2/3 transform -translate-x-1/3 -translate-y-1/2 text-9xl mb-6 z-10">
+          Welcome To AI World.
         </h1>
       </div>
 
@@ -31,7 +63,7 @@ const Register = () => {
           <h2 className="text-4xl font-bold text-gray-900 mb-8 justify-center text-center">
             Log in
           </h2>
-          <form className="space-y-6 px-10">
+          <form onSubmit={handleSubmit} className="space-y-6 px-10">
             <div>
               <div className="flex items-center bg-gray-100 rounded-full px-3">
                 <span className="text-gray-400 mr-2">
@@ -39,8 +71,11 @@ const Register = () => {
                   {/* Use React Icons for true modern icons */}
                 </span>
                 <input
-                  type="name"
-                  placeholder="name"
+                  name="name"
+                  type="text"
+                  value={form.name}
+                  onChange={handleChange}
+                  placeholder="Name"
                   className="w-full bg-transparent p-3 outline-none rounded-full"
                 />
               </div>
@@ -52,7 +87,10 @@ const Register = () => {
                   {/* Use React Icons for true modern icons */}
                 </span>
                 <input
+                  name="email"
                   type="email"
+                  value={form.email}
+                  onChange={handleChange}
                   placeholder="email"
                   className="w-full bg-transparent p-3 outline-none rounded-full"
                 />
@@ -64,7 +102,10 @@ const Register = () => {
                   <i className="fas fa-lock" />
                 </span>
                 <input
+                  name="password"
                   type="password"
+                  value={form.password}
+                  onChange={handleChange}
                   placeholder="Password"
                   className="w-full bg-transparent p-3 outline-none rounded-full"
                 />
@@ -82,11 +123,13 @@ const Register = () => {
                 Forgot Password?
               </a>
             </div>
+            {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
             <button
               className="w-full bg-black text-white py-3 rounded-full font-semibold text-lg hover:bg-gray-900 transition"
               type="submit"
+              disabled={loading}
             >
-              Register New User
+              {loading ? "Registering..." : "Register"}
             </button>
             <div className="flex items-center my-4">
               <hr className="grow border-gray-300" />
