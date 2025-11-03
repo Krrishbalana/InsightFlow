@@ -5,7 +5,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
-import Insights from "./pages/Insights";
+import DatasetDetail from "./pages/DatasetDetail";
 import NotFound from "./pages/NotFound";
 import SplitText from "./components/Reactbits/SplitText";
 
@@ -54,7 +54,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/upload" element={<Upload />} />
-        <Route path="/insights/:id" element={<Insights />} />
+        <Route path="/datasets/:id" element={<DatasetDetail />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

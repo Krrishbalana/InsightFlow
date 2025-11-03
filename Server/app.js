@@ -8,6 +8,7 @@ import uploadRoutes from "./routes/uploadRoute.js";
 import connectDB from "./config/db.js";
 import cors from "cors";
 import userRoutes from "./routes/userRoutes.js";
+import datasetRoutes from "./routes/datasetRoutes.js";
 
 const app = express();
 app.use(express.json());
@@ -24,5 +25,6 @@ await connectDB(); // connect to database
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/datasets", datasetRoutes);
 
 app.listen(3000, () => console.log("✅ Server running on port 3000"));
