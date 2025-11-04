@@ -1,5 +1,7 @@
+// client/src/pages/DatasetDetail.jsx
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import axios from "axios";
 import Navbar from "../components/Navbar";
 import SpotlightCard from "../components/Reactbits/SpotlightCard/SpotlightCard";
 
@@ -10,54 +12,57 @@ const DatasetDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Use Vite env var (falls back to localhost:3000)
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+  // Require API base — no localhost fallback for production safety
+  const API_BASE = import.meta.env.VITE_API_URL;
+  if (!API_BASE) {
+    console.error("❌ Missing VITE_API_URL in environment variables");
+  }
 
   useEffect(() => {
     const fetchDataset = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/datasets/${id}`, {
-          method: "GET",
-          credentials: "include",
+        const res = await axios.get(`${API_BASE}/api/datasets/${id}`, {
+          withCredentials: true,
         });
-
-        if (!res.ok) {
-          const text = await res.text().catch(() => null);
-          throw new Error(text || "Failed to fetch dataset");
-        }
-        const data = await res.json();
-        setDataset(data);
+        setDataset(res.data);
       } catch (err) {
         console.error("Error fetching dataset details:", err);
-        setError(err.message || "Failed to load dataset");
+        const message =
+          err.response?.data?.message ||
+          err.message ||
+          "Failed to load dataset";
+        setError(message);
       } finally {
         setLoading(false);
       }
     };
 
-    if (id) fetchDataset();
+    if (id && API_BASE) fetchDataset();
   }, [id, API_BASE]);
 
-  if (loading)
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen text-gray-400 text-xl">
         Loading dataset details...
       </div>
     );
+  }
 
-  if (error)
+  if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen text-red-500 text-lg">
         {error}
       </div>
     );
+  }
 
-  if (!dataset)
+  if (!dataset) {
     return (
       <div className="flex items-center justify-center min-h-screen text-gray-500 text-lg">
         Dataset not found
       </div>
     );
+  }
 
   const fileName =
     dataset.file?.originalname || dataset.fileName || dataset.name || "Dataset";
@@ -65,22 +70,21 @@ const DatasetDetail = () => {
     ? new Date(dataset.createdAt).toLocaleString()
     : "Unknown";
 
-  // summary may be array or string; normalize to array for rendering cards
-  const summaries = Array.isArray(dataset.summary)
+  const summaries = Array.isArray(dataset?.summary)
     ? dataset.summary
-    : dataset.summary
+    : dataset?.summary
     ? [
         {
           column: "Summary",
+          text: dataset.summary,
           avg: null,
           min: null,
           max: null,
-          text: dataset.summary,
         },
       ]
     : [];
 
-  const insights = Array.isArray(dataset.insights) ? dataset.insights : [];
+  const insights = Array.isArray(dataset?.insights) ? dataset.insights : [];
 
   return (
     <div className="min-h-screen w-full relative text-white">
@@ -103,7 +107,7 @@ const DatasetDetail = () => {
       <div className="relative z-30 flex flex-col items-center justify-start px-10 pt-12 space-y-10">
         {/* Back Button */}
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate("/dashboard")}
           className="self-start bg-zinc-800/80 px-6 py-2 rounded-full text-sm hover:bg-zinc-700 transition-all duration-300 shadow-md"
         >
           ← Back to Dashboard
@@ -136,7 +140,6 @@ const DatasetDetail = () => {
                     {s.column ?? s.title ?? `Column ${idx + 1}`}
                   </h3>
 
-                  {/* numeric stats if present */}
                   {typeof s.avg === "number" ||
                   typeof s.min === "number" ||
                   typeof s.max === "number" ? (
@@ -155,7 +158,6 @@ const DatasetDetail = () => {
                       </p>
                     </>
                   ) : (
-                    // fallback text summary
                     <p className="text-gray-300">
                       {s.text ?? s.detail ?? "No numeric stats."}
                     </p>
@@ -194,7 +196,7 @@ const DatasetDetail = () => {
         {/* Footer / Back */}
         <div className="mt-16 mb-10">
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => navigate("/dashboard")}
             className="px-10 py-3 rounded-full text-lg bg-white text-black font-semibold hover:bg-gray-200 transition-all"
           >
             Back to Dashboard

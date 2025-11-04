@@ -33,6 +33,12 @@ export const getUserDatasets = async (req, res) => {
       .limit(limit)
       .lean();
 
+    // Logging for easier debugging in dev
+    console.log(
+      `Fetched ${datasets.length} datasets for user ${userId} (page ${page})`
+    );
+
+    // Return wrapper shape (frontend now handles both shapes)
     return res.status(200).json({ data: datasets, page, limit });
   } catch (err) {
     console.error("Error fetching datasets:", err);
@@ -50,7 +56,8 @@ export const getDatasetById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    if (!id || !isValidId(id)) {
+    // Validate MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid dataset ID" });
     }
 
@@ -59,17 +66,22 @@ export const getDatasetById = async (req, res) => {
       return res.status(404).json({ message: "Dataset not found" });
     }
 
-    // If auth present, enforce owner-only access
-    if (req.user && dataset.userId.toString() !== req.user._id.toString()) {
+    // Enforce auth: only owner can view
+    if (!req.user) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    if (dataset.userId?.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: "Access denied" });
     }
 
-    return res.status(200).json({ data: dataset });
+    // Send plain dataset directly (frontend expects this)
+    return res.status(200).json(dataset);
   } catch (err) {
-    console.error("Error fetching dataset details:", err);
+    console.error("❌ Error fetching dataset details:", err);
     return res
       .status(500)
-      .json({ message: "Server error", error: err.message });
+      .json({ message: "Internal server error", error: err.message });
   }
 };
 

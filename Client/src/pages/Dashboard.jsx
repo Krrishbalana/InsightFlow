@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import ProfileCard from "../components/Reactbits/ProfileCard/ProfileCard";
 import DatasetCard from "../components/DatasetCard";
 import UploadForm from "../components/UploadForm";
-import { useNavigate } from "react-router-dom";
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
@@ -18,98 +18,158 @@ const Dashboard = () => {
   // Use Vite env var (falls back to localhost:3000)
   const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-  // ✅ Load user + datasets
   useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+
+    // fetchDatasets ab defensive hai: backend chahe `[...]` de ya `{ data: [...] }`, dono handle karega
+    const fetchDatasets = async (userId) => {
+      try {
+        setLoadingDatasets(true);
+        setError("");
+        const res = await fetch(
+          `${API_BASE}/api/datasets?userId=${encodeURIComponent(userId)}`,
+          {
+            method: "GET",
+            credentials: "include",
+            signal: controller.signal,
+          }
+        );
+        if (!res.ok) {
+          // try to extract message for better error logs
+          let errMsg = "Failed to fetch datasets";
+          try {
+            const errJson = await res.json();
+            if (errJson && errJson.message) errMsg = errJson.message;
+          } catch (e) {
+            /* ignore parse error */
+          }
+          throw new Error(errMsg);
+        }
+
+        const json = await res.json();
+        // Normalize response shape:
+        const datasetsArr = Array.isArray(json)
+          ? json
+          : Array.isArray(json.data)
+          ? json.data
+          : [];
+        if (!cancelled) setDatasets(datasetsArr);
+      } catch (err) {
+        if (err.name === "AbortError") return; // fetch was aborted
+        console.error("fetchDatasets error:", err);
+        if (!cancelled) {
+          setError(err.message || "Failed to load datasets");
+          setDatasets([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingDatasets(false);
+      }
+    };
+
+    // checkAuthAndLoad ab bhi defensive: backend chahe `{ data: user }` de ya `user` object, dono handle karega
     const checkAuthAndLoad = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/auth/me`, {
           method: "GET",
           credentials: "include",
+          signal: controller.signal,
         });
 
-        if (!res.ok) throw new Error("Unauthorized");
-        const data = await res.json();
-        setUser(data);
-
-        if (data && (data._id || data.id)) {
-          await fetchDatasets(data._id || data.id);
+        if (!res.ok) {
+          // Unauthorized or other error -> redirect to login
+          throw new Error("Unauthorized");
         }
+
+        const json = await res.json();
+        const userObj = json && json.data ? json.data : json;
+        if (cancelled) return;
+        setUser(userObj);
+
+        const userId = userObj && (userObj._id || userObj.id);
+        if (userId) await fetchDatasets(userId);
       } catch (err) {
-        console.warn("Redirecting to login:", err.message);
+        if (err.name === "AbortError") return;
+        console.warn("Redirecting to login:", err?.message || err);
         navigate("/login");
       } finally {
-        setLoadingUser(false);
+        if (!cancelled) setLoadingUser(false);
       }
     };
 
     checkAuthAndLoad();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [navigate, API_BASE]);
 
-  // ✅ Fetch all datasets for user
-  const fetchDatasets = async (userId) => {
-    try {
-      setLoadingDatasets(true);
-      setError("");
-      const res = await fetch(`${API_BASE}/api/datasets?userId=${userId}`, {
-        method: "GET",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to fetch datasets");
-      const data = await res.json();
-      setDatasets(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error(err);
-      setError(err.message || "Failed to load datasets");
-      setDatasets([]);
-    } finally {
-      setLoadingDatasets(false);
-    }
-  };
-
-  // ✅ Logout handler
-  const handleLogout = async () => {
+  // Logout handler
+  const handleLogout = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Logout failed");
+      if (!res.ok) {
+        let errMsg = "Logout failed";
+        try {
+          const errJson = await res.json();
+          if (errJson && errJson.message) errMsg = errJson.message;
+        } catch (e) {}
+        throw new Error(errMsg);
+      }
       localStorage.removeItem("user");
       navigate("/");
     } catch (err) {
-      console.error("Logout error:", err.message);
+      console.error("Logout error:", err?.message || err);
+      alert("Error logging out: " + (err?.message || err));
     }
-  };
+  }, [navigate, API_BASE]);
 
-  // ✅ Navigation handlers
-  const openDataset = (id) => navigate(`/datasets/${id}`);
+  // Navigation handlers
+  const openDataset = useCallback(
+    (id) => {
+      if (!id) return;
+      navigate(`/datasets/${id}`);
+    },
+    [navigate]
+  );
 
-  // ✅ Delete dataset (with confirmation + instant UI update)
-  const handleDelete = async (id) => {
-    const confirmDelete = window.confirm(
-      "Are you sure you want to delete this dataset? This cannot be undone."
-    );
-    if (!confirmDelete) return;
+  // Delete dataset (with confirmation + instant UI update). IDs normalized with String(...)
+  const handleDelete = useCallback(
+    async (id) => {
+      if (!id) return;
+      const confirmDelete = window.confirm(
+        "Are you sure you want to delete this dataset? This cannot be undone."
+      );
+      if (!confirmDelete) return;
 
-    try {
-      const res = await fetch(`${API_BASE}/api/datasets/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
+      try {
+        const res = await fetch(`${API_BASE}/api/datasets/${id}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
 
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message || "Delete failed");
+        const result = await res.json();
+        if (!res.ok) throw new Error(result?.message || "Delete failed");
 
-      setDatasets((prev) => prev.filter((d) => (d._id || d.id) !== id));
-      alert("✅ Dataset deleted successfully!");
-    } catch (err) {
-      console.error("Delete error:", err);
-      alert("❌ Failed to delete dataset: " + err.message);
-    }
-  };
+        // Filter using string conversion to avoid object vs string mismatch
+        setDatasets((prev) =>
+          prev.filter((d) => String(d._id || d.id || "") !== String(id))
+        );
+        alert("✅ Dataset deleted successfully!");
+      } catch (err) {
+        console.error("Delete error:", err);
+        alert("❌ Failed to delete dataset: " + (err?.message || err));
+      }
+    },
+    [API_BASE]
+  );
 
-  // ✅ Upload modal trigger
-  const handleUpload = () => setShowUploadForm(true);
+  // Upload modal trigger
+  const handleUpload = useCallback(() => setShowUploadForm(true), []);
 
   // --- UI loading states ---
   if (loadingUser)
@@ -166,7 +226,8 @@ const Dashboard = () => {
           <div className="w-full flex justify-center mt-4">
             <button
               onClick={handleLogout}
-              className="bg-red-600 text-white py-3 rounded-full hover:bg-red-700 px-10 transition-all duration-400 ease-in-out hover:px-20"
+              className="bg-red-600 text-white py-3 rounded-full hover:bg-red-700 px-10 transition-all duration-300 ease-in-out transform hover:scale-105"
+              aria-label="Logout"
             >
               Logout
             </button>
@@ -181,16 +242,17 @@ const Dashboard = () => {
               onClick={handleUpload}
               className="relative overflow-hidden px-6 py-3 text-sm font-semibold text-white bg-black rounded-full
                transition-all duration-500 hover:scale-105 active:scale-95 group"
+              aria-haspopup="dialog"
             >
               <span className="relative z-10">Upload New Dataset</span>
               <span
                 className="absolute inset-0 bg-gradient-to-r from-zinc-200 via-zinc-500 to-zinc-900 opacity-0
                  group-hover:opacity-100 blur-md transition-all duration-700"
-              ></span>
+              />
               <span
                 className="absolute inset-0 border border-zinc-100 rounded-full group-hover:border-transparent
                  group-hover:shadow-[0_0_15px_rgba(0,255,255,0.6)] transition-all duration-500"
-              ></span>
+              />
             </button>
           </div>
 
@@ -205,14 +267,14 @@ const Dashboard = () => {
                 No datasets yet. Upload one to see it here.
               </div>
             ) : (
-              datasets.map((d) => (
-                <div key={d._id || d.id}>
-                  <DatasetCard
-                    dataset={d}
-                    onView={openDataset}
-                    onDelete={handleDelete} // ✅ delete hook
-                  />
-                </div>
+              datasets.map((d, index) => (
+                // Put key on DatasetCard directly. Use index as last-resort fallback.
+                <DatasetCard
+                  key={d._id || d.id || index}
+                  dataset={d}
+                  onView={openDataset}
+                  onDelete={handleDelete}
+                />
               ))
             )}
           </div>
@@ -231,7 +293,25 @@ const Dashboard = () => {
         <UploadForm
           onClose={() => setShowUploadForm(false)}
           onUpload={(newDataset) =>
-            setDatasets((prev) => [newDataset, ...prev])
+            setDatasets((prev) => {
+              // Defensive: ensure newDataset is an object and not duplicate
+              if (!newDataset || typeof newDataset !== "object") return prev;
+              const id = newDataset._id || newDataset.id;
+              // prevent duplicates: if id exists in prev, replace it; else prepend
+              if (id) {
+                const exists = prev.some(
+                  (p) => String(p._id || p.id) === String(id)
+                );
+                if (exists) {
+                  return prev.map((p) =>
+                    String(p._id || p.id) === String(id) ? newDataset : p
+                  );
+                }
+                return [newDataset, ...prev];
+              }
+              // fallback: just prepend
+              return [newDataset, ...prev];
+            })
           }
         />
       )}
