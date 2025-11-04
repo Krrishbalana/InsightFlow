@@ -58,8 +58,6 @@ const corsOptions = {
 
 // Use CORS
 app.use(cors(corsOptions));
-// Ensure preflight requests are handled for every route
-app.options("*", cors(corsOptions));
 
 /* Optional security middlewares (recommended before production)
 app.use(helmet());
