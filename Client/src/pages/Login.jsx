@@ -8,6 +8,9 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Use Vite env var (falls back to localhost:3000)
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -18,14 +21,14 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:3000/api/auth/login", {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
         credentials: "include", // required for sending cookie
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         console.error("❌ Login error:", data);
@@ -35,12 +38,12 @@ const Login = () => {
       console.log("✅ Logged in:", data);
 
       // store user info locally (optional)
-      localStorage.setItem("user", JSON.stringify(data.user));
+      if (data.user) localStorage.setItem("user", JSON.stringify(data.user));
 
       // navigate to dashboard
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Login failed");
     } finally {
       setLoading(false);
     }

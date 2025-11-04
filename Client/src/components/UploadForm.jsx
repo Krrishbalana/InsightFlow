@@ -5,6 +5,9 @@ const UploadForm = ({ onClose, onUpload }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Use env var (fallback to localhost for dev)
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
     setError("");
@@ -21,8 +24,8 @@ const UploadForm = ({ onClose, onUpload }) => {
       const formData = new FormData();
       formData.append("file", file);
 
-      // API call
-      const res = await fetch("http://localhost:3000/api/upload/fileupload", {
+      // API call using env var
+      const res = await fetch(`${API_BASE}/api/upload/fileupload`, {
         method: "POST",
         body: formData,
         credentials: "include",
@@ -31,11 +34,11 @@ const UploadForm = ({ onClose, onUpload }) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Upload failed");
 
-      onUpload?.(data); // notify parent (Dashboard) of new dataset
+      onUpload?.(data); // notify parent (Dashboard)
       onClose(); // close modal
     } catch (err) {
       console.error("Upload error:", err);
-      setError(err.message);
+      setError(err.message || "Upload failed");
     } finally {
       setLoading(false);
     }
@@ -78,7 +81,7 @@ const UploadForm = ({ onClose, onUpload }) => {
             <p className="text-red-500 text-center text-sm mt-2">{error}</p>
           )}
 
-          {/* Upload Button (same style as Dashboard button) */}
+          {/* Upload Button */}
           <button
             type="submit"
             disabled={loading}

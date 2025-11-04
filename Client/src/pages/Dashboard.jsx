@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import ProfileCard from "../components/Reactbits/ProfileCard/ProfileCard";
-import DatasetCard from "../components/DatasetCard"; // ensure this exists
+import DatasetCard from "../components/DatasetCard";
 import UploadForm from "../components/UploadForm";
 import { useNavigate } from "react-router-dom";
 
@@ -15,10 +15,14 @@ const Dashboard = () => {
 
   const navigate = useNavigate();
 
+  // Use Vite env var (falls back to localhost:3000)
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
+  // ✅ Load user + datasets
   useEffect(() => {
     const checkAuthAndLoad = async () => {
       try {
-        const res = await fetch("http://localhost:3000/api/auth/me", {
+        const res = await fetch(`${API_BASE}/api/auth/me`, {
           method: "GET",
           credentials: "include",
         });
@@ -39,20 +43,17 @@ const Dashboard = () => {
     };
 
     checkAuthAndLoad();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate]);
+  }, [navigate, API_BASE]);
 
+  // ✅ Fetch all datasets for user
   const fetchDatasets = async (userId) => {
     try {
       setLoadingDatasets(true);
       setError("");
-      const res = await fetch(
-        `http://localhost:3000/api/datasets?userId=${userId}`,
-        {
-          method: "GET",
-          credentials: "include",
-        }
-      );
+      const res = await fetch(`${API_BASE}/api/datasets?userId=${userId}`, {
+        method: "GET",
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch datasets");
       const data = await res.json();
       setDatasets(Array.isArray(data) ? data : []);
@@ -65,9 +66,10 @@ const Dashboard = () => {
     }
   };
 
+  // ✅ Logout handler
   const handleLogout = async () => {
     try {
-      const res = await fetch("http://localhost:3000/api/auth/logout", {
+      const res = await fetch(`${API_BASE}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
       });
@@ -79,12 +81,37 @@ const Dashboard = () => {
     }
   };
 
+  // ✅ Navigation handlers
   const openDataset = (id) => navigate(`/datasets/${id}`);
-  const manageDataset = (id) => navigate(`/datasets/${id}/edit`);
 
-  // instead of navigating to /upload, show the modal form
+  // ✅ Delete dataset (with confirmation + instant UI update)
+  const handleDelete = async (id) => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this dataset? This cannot be undone."
+    );
+    if (!confirmDelete) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/datasets/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message || "Delete failed");
+
+      setDatasets((prev) => prev.filter((d) => (d._id || d.id) !== id));
+      alert("✅ Dataset deleted successfully!");
+    } catch (err) {
+      console.error("Delete error:", err);
+      alert("❌ Failed to delete dataset: " + err.message);
+    }
+  };
+
+  // ✅ Upload modal trigger
   const handleUpload = () => setShowUploadForm(true);
 
+  // --- UI loading states ---
   if (loadingUser)
     return <p className="text-center mt-20 text-gray-500">Loading user...</p>;
 
@@ -97,9 +124,10 @@ const Dashboard = () => {
   const handleFromEmail = user.email ? user.email.split("@")[0] : "user";
   const avatarUrl = user.avatarUrl || "/default-avatar.png";
 
+  // ✅ UI Layout
   return (
     <div className="min-h-screen w-full relative">
-      {/* Background panel (unchanged) */}
+      {/* Background panel */}
       <div
         className="absolute inset-0 bg-black"
         style={{
@@ -109,14 +137,14 @@ const Dashboard = () => {
         }}
       />
 
-      {/* Navbar at top */}
+      {/* Navbar */}
       <div className="relative z-30 px-6 py-6">
         <Navbar />
       </div>
 
-      {/* Main layout: left column + right datasets */}
+      {/* Main layout */}
       <div className="relative z-30 flex gap-8 px-10 pb-20">
-        {/* Left column */}
+        {/* Left column - Profile + Logout */}
         <div className="w-[420px] flex flex-col justify-center items-center">
           <div className="mt-10 mb-10 w-full flex justify-center">
             <ProfileCard
@@ -135,7 +163,6 @@ const Dashboard = () => {
             />
           </div>
 
-          {/* Logout button */}
           <div className="w-full flex justify-center mt-4">
             <button
               onClick={handleLogout}
@@ -146,8 +173,9 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Right column */}
+        {/* Right column - Datasets */}
         <div className="flex-1">
+          {/* Upload Button */}
           <div className="flex justify-end items-center mb-6">
             <button
               onClick={handleUpload}
@@ -182,13 +210,14 @@ const Dashboard = () => {
                   <DatasetCard
                     dataset={d}
                     onView={openDataset}
-                    onManage={manageDataset}
+                    onDelete={handleDelete} // ✅ delete hook
                   />
                 </div>
               ))
             )}
           </div>
 
+          {/* Error */}
           {error && (
             <div className="mt-6 bg-red-100 text-red-700 p-3 rounded text-center max-w-xl">
               {error}

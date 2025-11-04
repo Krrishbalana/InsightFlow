@@ -10,27 +10,33 @@ const DatasetDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Use Vite env var (falls back to localhost:3000)
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
+
   useEffect(() => {
     const fetchDataset = async () => {
       try {
-        const res = await fetch(`http://localhost:3000/api/datasets/${id}`, {
+        const res = await fetch(`${API_BASE}/api/datasets/${id}`, {
           method: "GET",
           credentials: "include",
         });
 
-        if (!res.ok) throw new Error("Failed to fetch dataset");
+        if (!res.ok) {
+          const text = await res.text().catch(() => null);
+          throw new Error(text || "Failed to fetch dataset");
+        }
         const data = await res.json();
         setDataset(data);
       } catch (err) {
         console.error("Error fetching dataset details:", err);
-        setError(err.message);
+        setError(err.message || "Failed to load dataset");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchDataset();
-  }, [id]);
+    if (id) fetchDataset();
+  }, [id, API_BASE]);
 
   if (loading)
     return (
@@ -52,6 +58,29 @@ const DatasetDetail = () => {
         Dataset not found
       </div>
     );
+
+  const fileName =
+    dataset.file?.originalname || dataset.fileName || dataset.name || "Dataset";
+  const uploadedAt = dataset.createdAt
+    ? new Date(dataset.createdAt).toLocaleString()
+    : "Unknown";
+
+  // summary may be array or string; normalize to array for rendering cards
+  const summaries = Array.isArray(dataset.summary)
+    ? dataset.summary
+    : dataset.summary
+    ? [
+        {
+          column: "Summary",
+          avg: null,
+          min: null,
+          max: null,
+          text: dataset.summary,
+        },
+      ]
+    : [];
+
+  const insights = Array.isArray(dataset.insights) ? dataset.insights : [];
 
   return (
     <div className="min-h-screen w-full relative text-white">
@@ -83,38 +112,57 @@ const DatasetDetail = () => {
         {/* Dataset Header */}
         <div className="text-center">
           <h1 className="text-5xl font-extrabold text-white tracking-wide drop-shadow-md">
-            {dataset.fileName}
+            {fileName}
           </h1>
-          <p className="text-gray-400 mt-2">
-            Uploaded on {new Date(dataset.createdAt).toLocaleString()}
-          </p>
+          <p className="text-gray-400 mt-2">Uploaded on {uploadedAt}</p>
         </div>
 
         {/* Summary Section */}
         <div className="w-full max-w-5xl">
           <h2 className="text-3xl font-bold mb-6 text-zinc-100">Summary</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {dataset.summary.map((s, idx) => (
-              <SpotlightCard
-                key={idx}
-                spotlightColor="rgba(0, 229, 255, 0.25)"
-                className="bg-zinc-900 border border-zinc-700 p-6 rounded-3xl transition-all hover:scale-[1.02]"
-              >
-                <h3 className="text-xl font-semibold text-cyan-400 mb-2">
-                  {s.column}
-                </h3>
-                <p className="text-gray-300">
-                  <span className="font-bold text-zinc-100">Avg:</span>{" "}
-                  {Number.isFinite(s.avg) ? s.avg.toFixed(2) : "∞"}
-                </p>
-                <p className="text-gray-300">
-                  <span className="font-bold text-zinc-100">Min:</span> {s.min}
-                </p>
-                <p className="text-gray-300">
-                  <span className="font-bold text-zinc-100">Max:</span> {s.max}
-                </p>
-              </SpotlightCard>
-            ))}
+            {summaries.length === 0 ? (
+              <div className="text-gray-400 col-span-full">
+                No summary available.
+              </div>
+            ) : (
+              summaries.map((s, idx) => (
+                <SpotlightCard
+                  key={idx}
+                  spotlightColor="rgba(0, 229, 255, 0.25)"
+                  className="bg-zinc-900 border border-zinc-700 p-6 rounded-3xl transition-all hover:scale-[1.02]"
+                >
+                  <h3 className="text-xl font-semibold text-cyan-400 mb-2">
+                    {s.column ?? s.title ?? `Column ${idx + 1}`}
+                  </h3>
+
+                  {/* numeric stats if present */}
+                  {typeof s.avg === "number" ||
+                  typeof s.min === "number" ||
+                  typeof s.max === "number" ? (
+                    <>
+                      <p className="text-gray-300">
+                        <span className="font-bold text-zinc-100">Avg:</span>{" "}
+                        {Number.isFinite(s.avg) ? s.avg.toFixed(2) : "—"}
+                      </p>
+                      <p className="text-gray-300">
+                        <span className="font-bold text-zinc-100">Min:</span>{" "}
+                        {s.min ?? "—"}
+                      </p>
+                      <p className="text-gray-300">
+                        <span className="font-bold text-zinc-100">Max:</span>{" "}
+                        {s.max ?? "—"}
+                      </p>
+                    </>
+                  ) : (
+                    // fallback text summary
+                    <p className="text-gray-300">
+                      {s.text ?? s.detail ?? "No numeric stats."}
+                    </p>
+                  )}
+                </SpotlightCard>
+              ))
+            )}
           </div>
         </div>
 
@@ -122,18 +170,24 @@ const DatasetDetail = () => {
         <div className="w-full max-w-5xl mt-10">
           <h2 className="text-3xl font-bold mb-6 text-zinc-100">Insights</h2>
           <div className="grid md:grid-cols-2 gap-6">
-            {dataset.insights.map((i, idx) => (
-              <SpotlightCard
-                key={idx}
-                spotlightColor="rgba(255, 255, 255, 0.2)"
-                className="bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 p-6 rounded-3xl transition-all hover:scale-[1.02]"
-              >
-                <h3 className="text-lg font-semibold text-white mb-2">
-                  💡 {i.insight}
-                </h3>
-                <p className="text-gray-400">{i.impact}</p>
-              </SpotlightCard>
-            ))}
+            {insights.length === 0 ? (
+              <div className="text-gray-400 col-span-full">
+                No insights available.
+              </div>
+            ) : (
+              insights.map((i, idx) => (
+                <SpotlightCard
+                  key={idx}
+                  spotlightColor="rgba(255, 255, 255, 0.2)"
+                  className="bg-gradient-to-br from-zinc-800 to-zinc-900 border border-zinc-700 p-6 rounded-3xl transition-all hover:scale-[1.02]"
+                >
+                  <h3 className="text-lg font-semibold text-white mb-2">
+                    💡 {i.title ?? i.insight ?? `Insight ${idx + 1}`}
+                  </h3>
+                  <p className="text-gray-400">{i.detail ?? i.impact ?? "—"}</p>
+                </SpotlightCard>
+              ))
+            )}
           </div>
         </div>
 
