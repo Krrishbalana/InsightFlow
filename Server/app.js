@@ -1,4 +1,4 @@
-// Server/app.js (improved)
+// Server/app.js (final, ready-to-paste)
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -42,7 +42,7 @@ const corsOptions = {
     const cleaned = normalizeOrigin(incomingOrigin);
     if (cleaned === CLIENT_ORIGIN) return callback(null, true);
 
-    // otherwise reject
+    // otherwise reject (pass an error to callback, we'll handle it)
     return callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
@@ -56,22 +56,45 @@ const corsOptions = {
   preflightContinue: false,
 };
 
-// Use CORS
-app.use(cors(corsOptions));
+// Use CORS middleware
+app.use((req, res, next) => {
+  cors(corsOptions)(req, res, (err) => {
+    if (err) {
+      // If CORS denied, respond with 403 instead of crashing
+      console.warn("CORS denied:", err.message || err);
+      return res
+        .status(403)
+        .json({ message: "CORS error: origin not allowed" });
+    }
+    next();
+  });
+});
 
-/* Optional security middlewares (recommended before production)
-app.use(helmet());
-app.use(rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 100 // limit requests per windowMs
-}));
-*/
+// Optional security middlewares (recommended before production)
+// app.use(helmet());
+// app.use(rateLimit({
+//   windowMs: 60 * 1000, // 1 minute
+//   max: 100 // limit requests per windowMs
+// }));
 
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/datasets", datasetRoutes);
+
+// Generic 404
+app.use((req, res) => {
+  res.status(404).json({ message: "Not found" });
+});
+
+// Global error handler (safety net)
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  if (!res.headersSent) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
 
 // Start server only after DB is connected
 const start = async () => {
