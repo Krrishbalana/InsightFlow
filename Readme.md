@@ -6,7 +6,7 @@ InsightFlow is a full-stack web application that automates CSV data analysis by 
 It helps users — especially non-technical ones — extract meaningful patterns from raw datasets instantly, without manual calculations or complex tools.
 
 🔗 **Project Link:** [https://github.com/krrishbalana/InsightFlow](https://github.com/krrishbalana/InsightFlow)  
-🌐 **Demo:** (Frontend in progress)
+🌐 **Demo:** [Demo Link](https://insight-flow-pearl.vercel.app/)
 
 ---
 
